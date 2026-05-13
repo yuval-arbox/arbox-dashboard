@@ -1,0 +1,791 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Arbox – שימוש ב-API לפי עסק וחודש</title>
+<style>
+  :root {
+    --navy: #1B2A4A;
+    --navy-mid: #253d6b;
+    --navy-light: #d6dce8;
+    --teal: #00B4D8;
+    --teal-light: #e0f7fc;
+    --teal-mid: #90e0ef;
+    --white: #ffffff;
+    --gray-bg: #f5f7fa;
+    --gray-border: #dde3ed;
+    --gray-text: #6b7a99;
+    --text-dark: #1B2A4A;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: 'Segoe UI', Arial, sans-serif;
+    background: var(--gray-bg);
+    color: var(--text-dark);
+    min-height: 100vh;
+    direction: rtl;
+  }
+  header {
+    background: var(--navy);
+    padding: 18px 32px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+  }
+  .logo {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .logo-box {
+    width: 36px; height: 36px;
+    background: var(--teal);
+    border-radius: 8px;
+    display: flex; align-items: center; justify-content: center;
+    font-weight: 700; color: #fff; font-size: 16px; letter-spacing: -0.5px;
+  }
+  .logo-text { color: #fff; font-size: 18px; font-weight: 600; letter-spacing: 0.3px; }
+  header h1 {
+    color: rgba(255,255,255,0.85);
+    font-size: 14px;
+    font-weight: 400;
+    margin-right: auto;
+  }
+  .main { padding: 24px 32px; }
+  .controls {
+    display: flex;
+    gap: 12px;
+    margin-bottom: 16px;
+    flex-wrap: wrap;
+    align-items: center;
+  }
+  .search-wrap {
+    position: relative;
+    flex: 1; min-width: 220px; max-width: 360px;
+  }
+  .search-wrap svg {
+    position: absolute; right: 10px; top: 50%; transform: translateY(-50%);
+    color: var(--gray-text); pointer-events: none;
+  }
+  input[type="text"] {
+    width: 100%;
+    padding: 8px 34px 8px 12px;
+    border: 1.5px solid var(--gray-border);
+    border-radius: 8px;
+    font-size: 13px;
+    color: var(--text-dark);
+    background: #fff;
+    outline: none;
+    transition: border-color 0.15s;
+    direction: rtl;
+  }
+  input[type="text"]:focus { border-color: var(--teal); }
+  .btn-export {
+    display: inline-flex; align-items: center; gap: 7px;
+    background: var(--teal);
+    color: #fff;
+    border: none;
+    border-radius: 8px;
+    padding: 8px 18px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.15s;
+  }
+  .btn-export:hover { background: #009ab8; }
+  .stats {
+    display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 20px;
+  }
+  .stat {
+    background: #fff;
+    border: 1.5px solid var(--gray-border);
+    border-radius: 10px;
+    padding: 12px 20px;
+    min-width: 120px;
+  }
+  .stat-label { font-size: 11px; color: var(--gray-text); margin-bottom: 4px; }
+  .stat-val { font-size: 22px; font-weight: 700; color: var(--navy); }
+  .tbl-wrap {
+    overflow: auto;
+    border-radius: 12px;
+    border: 1.5px solid var(--gray-border);
+    background: #fff;
+    max-height: calc(100vh - 240px);
+    box-shadow: 0 2px 12px rgba(27,42,74,0.07);
+  }
+  table {
+    border-collapse: separate;
+    border-spacing: 0;
+    width: 100%;
+    font-size: 12.5px;
+  }
+  thead th {
+    background: var(--navy);
+    color: #fff;
+    font-weight: 600;
+    padding: 10px 12px;
+    white-space: nowrap;
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    border-bottom: 2px solid var(--teal);
+    user-select: none;
+  }
+  thead th.col-biz {
+    position: sticky; right: 0; z-index: 20;
+    background: var(--navy);
+    min-width: 200px; max-width: 200px;
+    text-align: right;
+    border-left: 2px solid var(--teal);
+  }
+  thead th.col-pkg {
+    position: sticky; right: 200px; z-index: 20;
+    background: var(--navy);
+    min-width: 145px; max-width: 145px;
+    text-align: right;
+    border-left: 2px solid rgba(0,180,216,0.35);
+  }
+  thead th.col-total {
+    background: #0f1e35;
+    min-width: 80px;
+    border-right: 1.5px solid rgba(0,180,216,0.4);
+  }
+  thead th.col-month {
+    min-width: 72px;
+    text-align: center;
+    cursor: pointer;
+    transition: background 0.1s;
+  }
+  thead th.col-month:hover { background: #253d6b; }
+  thead th.sorted { background: var(--teal); color: #fff; }
+  thead th.sorted.col-biz,
+  thead th.sorted.col-pkg { background: var(--teal); }
+  tbody tr { transition: background 0.08s; }
+  tbody tr:nth-child(even) td { background: #f8fafc; }
+  tbody tr:hover td { background: rgba(0,180,216,0.07) !important; }
+  tbody tr:hover td.col-biz,
+  tbody tr:hover td.col-pkg { background: rgba(0,180,216,0.07) !important; }
+  tbody td {
+    padding: 6px 12px;
+    white-space: nowrap;
+    border-bottom: 1px solid #edf0f7;
+    color: var(--text-dark);
+  }
+  td.col-biz {
+    position: sticky; right: 0; z-index: 5;
+    background: #fff;
+    font-weight: 600;
+    min-width: 200px; max-width: 200px;
+    overflow: hidden; text-overflow: ellipsis;
+    border-left: 2px solid var(--gray-border);
+    font-size: 12px;
+  }
+  tr:nth-child(even) td.col-biz { background: #f8fafc; }
+  td.col-pkg {
+    position: sticky; right: 200px; z-index: 5;
+    background: #fff;
+    min-width: 145px; max-width: 145px;
+    overflow: hidden; text-overflow: ellipsis;
+    border-left: 1px solid #edf0f7;
+  }
+  tr:nth-child(even) td.col-pkg { background: #f8fafc; }
+  td.col-val {
+    text-align: center;
+    font-variant-numeric: tabular-nums;
+    font-size: 12px;
+    color: var(--navy);
+    font-weight: 500;
+  }
+  td.col-total {
+    text-align: center;
+    font-weight: 700;
+    font-size: 12px;
+    color: var(--navy);
+    background: #fff !important;
+    border-right: 1.5px solid var(--gray-border);
+    cursor: pointer;
+  }
+  tr:nth-child(even) td.col-total { background: #f8fafc !important; }
+  .pkg-badge {
+    display: inline-block;
+    font-size: 10px;
+    padding: 2px 7px;
+    border-radius: 5px;
+    background: var(--teal-light);
+    color: #006a80;
+    font-weight: 600;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 130px;
+    vertical-align: middle;
+  }
+  .pkg-badge.free { background: #fff8e1; color: #8a6200; }
+  .pkg-badge.trial { background: #fce4ec; color: #880e4f; }
+  .pkg-badge.basic { background: #f3e5f5; color: #4a148c; }
+  .pkg-badge.pro { background: #e8f5e9; color: #1b5e20; }
+  .pkg-badge.global { background: #e8eaf6; color: #1a237e; }
+  .pkg-badge.clinic { background: #fff3e0; color: #bf360c; }
+  .no-rows {
+    text-align: center; padding: 3rem;
+    color: var(--gray-text); font-size: 14px;
+  }
+  .sort-arrow { font-size: 10px; margin-right: 4px; opacity: 0.7; }
+  @media print {
+    header { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    .btn-export, .controls input { display: none; }
+    .tbl-wrap { max-height: none; overflow: visible; }
+    thead th { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    td[style] { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  }
+</style>
+</head>
+<body>
+<header>
+  <div class="logo">
+    <div class="logo-box">A</div>
+    <span class="logo-text">arbox</span>
+  </div>
+  <h1>שימוש ב-Public API לפי עסק וחודש</h1>
+</header>
+
+<div class="main">
+  <div class="stats" id="stats"></div>
+  <div class="controls">
+    <div class="search-wrap">
+      <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+      <input type="text" id="search" placeholder="חיפוש עסק או חבילה..." oninput="render()">
+    </div>
+    <button class="btn-export" onclick="exportCSV()">
+      <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+      ייצוא CSV
+    </button>
+  </div>
+  <div class="tbl-wrap">
+    <table id="tbl">
+      <thead id="head"></thead>
+      <tbody id="body"></tbody>
+    </table>
+  </div>
+</div>
+
+<script>
+const RAW=[
+["2026-05","Stage 1-פתח תקווה","IL Standard (Monthly)",564171],
+["2026-05","Team Lider - אימוני כושר לילדים ונערים","IL Standard (Monthly)",208981],
+["2026-05","calima - מתחם קליסטניקס","IL Standard (Monthly)",110842],
+["2026-05","ClearPass","Trial Mode",52020],
+["2026-05","We Well","IL Professional (Annually)",49621],
+["2026-05","Qualia","IL Standard (Monthly)",35723],
+["2026-05","Testing API","Free Account",28577],
+["2026-05","Revo Pilates","IL Professional (Monthly)",23192],
+["2026-05","Studio Ten","IL Professional (Annually)",19397],
+["2026-05","Zoharpilates","IL Standard (Annually)",13857],
+["2026-05","פילאטיס מכשירים בן יהודה 77 כפר סבא","IL Professional (Monthly)",10099],
+["2026-05","Dance Community Club","IL Professional (Monthly)",6563],
+["2026-05","DREAM COMPLEX","IL Standard (Annually)",6116],
+["2026-05","TOPSA","IL Standard (Monthly)",5545],
+["2026-05","VALE STUDIO","IL Professional (Monthly)",5541],
+["2026-05","Sea Gal","IL Professional (Monthly)",5440],
+["2026-05","סטודיו אפ","IL Standard (Monthly)",4715],
+["2026-05","Hitbox","IL Standard (Annually)",4075],
+["2026-05","סטודיו חן מלכה","IL Standard (Annually)",3511],
+["2026-05","BINENFIT TLV","IL Professional (Monthly)",3015],
+["2026-05","Hitbox TLV","IL Standard (Annually)",2965],
+["2026-05","THE ONE HUNDRED","IL Professional (Monthly)",2965],
+["2026-05","האימוניה","IL Standard (Annually)",2896],
+["2026-05","Allonge","IL Standard (Monthly)",2658],
+["2026-05","Back2Action","Global Standard (Monthly)",2636],
+["2026-05","De Club","IL Professional (Monthly)",1996],
+["2026-05","I-FIT","IL Professional (Annually)",1737],
+["2026-05","PilatHealth","IL Standard (Annually)",1674],
+["2026-05","Northern Knights","IL Standard (Monthly)",1547],
+["2026-05","מנטל כושר קרבי","IL Standard (Monthly)",1442],
+["2026-05","FreeBall","IL Standard (Annually)",1361],
+["2026-05","GO","IL Professional (Annually)",1240],
+["2026-05","דור בריא- מסגרת כושר והעצמה לנוער","IL Standard (Annually)",1237],
+["2026-05","ארנה חולון - ARENA GYM","IL Professional (Monthly)",1234],
+["2026-05","Paulina Fitness - Haifa","IL Professional (Monthly)",964],
+["2026-05","Paulina Fitness - Nof HaGalil","IL Professional (Monthly)",950],
+["2026-05","סטודיו נעים","IL Professional (Monthly)",924],
+["2026-05","Soho Team","IL Professional (Monthly)",807],
+["2026-05","ALL.FITNESS","IL Standard (Monthly)",804],
+["2026-05","Bloc","IL Professional (Annually)",777],
+["2026-05","Tone Line","IL Standard (Annually)",701],
+["2026-05","יוגה שאלה - יפו","IL Standard (Annually)",670],
+["2026-05","LAKE TLV","IL Professional (Monthly)",644],
+["2026-05","אייזיק","IL Standard (Annually)",604],
+["2026-05","BE FREE טבריה","IL Standard (Monthly)",604],
+["2026-05","Playnest","IL Professional (Annually)",585],
+["2026-05","Roca","IL Standard (Monthly)",581],
+["2026-05","Yogita","IL Standard (Annually)",441],
+["2026-05","Motion - Strength & Pilates","IL Standard (Monthly)",437],
+["2026-05","בולדר חיפה","IL Standard (Monthly)",429],
+["2026-05","Arbox Wellness","IL Professional (Annually)",426],
+["2026-05","CrossFit White City","IL Professional (Monthly)",415],
+["2026-05","נוער חזק-מסגרת כושר והעצמה לבני נוער","IL Standard (Annually)",410],
+["2026-05","Guy Vaserman My Training Studio","IL Standard (Monthly)",354],
+["2026-05","נינגה סקול","IL Professional (Annually)",352],
+["2026-05","Revo Fitness - אגם כנרת 6 נתניה","IL Professional (Monthly)",337],
+["2026-05","המרכז לעין יבשה","IL Clinics Business (Monthly)",303],
+["2026-05","MY STUDIOS","IL Professional (Monthly)",301],
+["2026-05","איתן- כל אחד יכול","IL Standard (Annually)",290],
+["2026-05","עדן אוף גארדן","IL Standard (Annually)",283],
+["2026-05","Move","IL Standard (Monthly)",272],
+["2026-05","לאטין גרוב","IL Standard (Annually)",226],
+["2026-05","BCbasketball","IL Professional (Monthly)",203],
+["2026-05","Beyond Fitness Lior Klein","IL Standard (Annually)",202],
+["2026-05","עלמה","IL Standard (Monthly)",191],
+["2026-05","Steps","IL Standard (Monthly)",184],
+["2026-05","עמותת ג׳רוספורט","IL Standard (Annually)",184],
+["2026-05","ג׳ימיבוקס - GYMIBOX","IL Professional (Annually)",168],
+["2026-05","Revo fitness - הכישור 30 חולון","IL Professional (Monthly)",165],
+["2026-05","היולי","IL Standard (Annually)",154],
+["2026-05","revo fitness - גיסין 7 פתח תקווה","IL Professional (Monthly)",126],
+["2026-05","Gul Pilates","IL Professional (Annually)",126],
+["2026-05","NOM Gaming","IL Standard (Annually)",124],
+["2026-05","Playtika new test","IL Professional (Monthly)",114],
+["2026-05","befit","IL Standard (Annually)",113],
+["2026-05","שיספורטס","IL Basic (Annually)",110],
+["2026-05","Team Bert","IL Standard (Annually)",94],
+["2026-05","lalifit","IL Standard (Monthly)",93],
+["2026-05","Dogotel","IL Standard (Monthly)",92],
+["2026-05","פילאטיס מכשירים - נעמי שמר 7 בת ים","IL Professional (Monthly)",83],
+["2026-05","TEST","IL Basic (Monthly)",80],
+["2026-05","טסט ארגון נכי צהל","Trial Mode - Clinics",78],
+["2026-05","Thribe","IL Professional (Annually)",74],
+["2026-05","רבו פיטנס אשדוד - הגדוד העברי 5 גן העיר","IL Professional (Monthly)",73],
+["2026-05","JOE URBAN PILATES","IL Standard (Monthly)",69],
+["2026-05","DM STUDIO","IL Professional (Annually)",69],
+["2026-05","Revo Fitness- אור יהודה","IL Professional (Monthly)",68],
+["2026-05","פילאטיס מכשירים הסוכה 14 ראשון לציון","IL Professional (Monthly)",67],
+["2026-05","pilatesmovement","IL Standard (Monthly)",65],
+["2026-05","WLNS Club","IL Professional (Monthly)",63],
+["2026-05","CrossFit City Of David","IL Standard (Monthly)",60],
+["2026-05","FORTE","IL Standard (Annually)",52],
+["2026-05","ROCKA STUDIO","IL Standard (Annually)",49],
+["2026-05","Hadass Lev Pilates House","IL Standard (Annually)",49],
+["2026-05","Unique Fitness","IL Standard (Monthly)",47],
+["2026-05","TALEL FITNESS","IL Standard (Monthly)",40],
+["2026-05","Legends Clinic","IL Clinics Business (Monthly)",28],
+["2026-04","Stage 1-פתח תקווה","IL Standard (Monthly)",1142438],
+["2026-04","calima - מתחם קליסטניקס","IL Standard (Monthly)",97801],
+["2026-04","Qualia","IL Standard (Monthly)",77935],
+["2026-04","Zoharpilates","IL Standard (Annually)",40756],
+["2026-04","Testing API","Free Account",38199],
+["2026-04","Studio Ten","IL Professional (Annually)",33240],
+["2026-04","האימוניה","IL Standard (Annually)",21667],
+["2026-04","Revo Pilates","IL Professional (Monthly)",20318],
+["2026-04","סטודיו נעים","IL Professional (Monthly)",17823],
+["2026-04","TOPSA","IL Standard (Monthly)",13002],
+["2026-04","Hitbox","IL Standard (Annually)",11335],
+["2026-04","פילאטיס מכשירים בן יהודה 77 כפר סבא","IL Professional (Monthly)",9467],
+["2026-04","PilatHealth","IL Standard (Annually)",9410],
+["2026-04","VALE STUDIO","IL Professional (Monthly)",9057],
+["2026-04","סטודיו חן מלכה","IL Standard (Annually)",8792],
+["2026-04","סטודיו אפ","IL Standard (Monthly)",8108],
+["2026-04","BINENFIT TLV","IL Professional (Monthly)",6788],
+["2026-04","We Well","IL Professional (Annually)",6701],
+["2026-04","Hitbox TLV","IL Standard (Annually)",5089],
+["2026-04","Beyond Fitness Lior Klein","IL Standard (Annually)",4462],
+["2026-04","מנטל כושר קרבי","IL Standard (Monthly)",4272],
+["2026-04","Sea Gal","IL Professional (Monthly)",3816],
+["2026-04","FreeBall","IL Standard (Annually)",3814],
+["2026-04","Back2Action","Global Standard (Monthly)",3193],
+["2026-04","GO","IL Professional (Annually)",2164],
+["2026-04","Roca","IL Standard (Monthly)",2118],
+["2026-04","DREAM COMPLEX","IL Standard (Annually)",2106],
+["2026-04","דור בריא- מסגרת כושר והעצמה לנוער","IL Standard (Annually)",2040],
+["2026-04","Soho Team","IL Professional (Monthly)",1980],
+["2026-04","ארנה חולון - ARENA GYM","IL Professional (Monthly)",1936],
+["2026-04","Yogita","IL Standard (Annually)",1726],
+["2026-04","De Club","IL Professional (Monthly)",1695],
+["2026-04","Bloc","IL Professional (Annually)",1622],
+["2026-04","עלמה","IL Standard (Monthly)",1545],
+["2026-04","אייזיק","IL Standard (Annually)",1521],
+["2026-04","יוגה שאלה - יפו","IL Standard (Annually)",1458],
+["2026-04","CrossFit White City","IL Professional (Monthly)",1450],
+["2026-04","LAKE TLV","IL Professional (Monthly)",1342],
+["2026-04","ALL.FITNESS","IL Standard (Monthly)",1327],
+["2026-04","SpinnerGym","IL Standard (Annually)",1026],
+["2026-04","נינגה סקול","IL Professional (Annually)",929],
+["2026-04","בית הספר לאומנויות לחימה - דן גדור","IL Standard (Annually)",920],
+["2026-04","איתן- כל אחד יכול","IL Standard (Annually)",908],
+["2026-04","Motion - Strength & Pilates","IL Standard (Monthly)",850],
+["2026-04","בולדר חיפה","IL Standard (Monthly)",843],
+["2026-04","Guy Vaserman My Training Studio","IL Standard (Monthly)",837],
+["2026-04","ג׳ימיבוקס - GYMIBOX","IL Professional (Annually)",817],
+["2026-04","BOOST FITNESS CENTER","IL Professional (Annually)",802],
+["2026-04","הבריכה הדינאמית","IL Standard (Annually)",582],
+["2026-04","being","IL Professional (Annually)",513],
+["2026-04","Steps","IL Standard (Monthly)",458],
+["2026-04","עמותת ג׳רוספורט","IL Standard (Annually)",452],
+["2026-04","עדן אוף גארדן","IL Standard (Annually)",440],
+["2026-04","Arbox Wellness","IL Professional (Annually)",438],
+["2026-04","Gul Pilates","IL Professional (Annually)",419],
+["2026-04","Revo Fitness - אגם כנרת 6 נתניה","IL Professional (Monthly)",411],
+["2026-04","revo fitness - גיסין 7 פתח תקווה","IL Professional (Monthly)",398],
+["2026-04","Revo fitness - הכישור 30 חולון","IL Professional (Monthly)",391],
+["2026-04","SEVEN","IL Standard (Monthly)",345],
+["2026-04","Paulina Fitness - Haifa","IL Professional (Monthly)",320],
+["2026-04","Hadass Lev Pilates House","IL Standard (Annually)",320],
+["2026-04","ניב כרמל ושות׳","IL Professional (Monthly)",284],
+["2026-04","Playnest","IL Professional (Annually)",281],
+["2026-04","Dance Community Club","IL Professional (Monthly)",264],
+["2026-04","Orca House of Fitness","IL Standard (Annually)",241],
+["2026-04","Revo Fitness - הדובדבן 9 קרית אונו","IL Professional (Monthly)",230],
+["2026-04","Thribe","IL Professional (Annually)",210],
+["2026-04","Revo Fitness- אור יהודה","IL Professional (Monthly)",197],
+["2026-04","Playtika new test","IL Professional (Monthly)",169],
+["2026-04","רוני שינקמן","IL Standard (Annually)",168],
+["2026-04","Terra Santa Kayak","IL Standard (Annually)",164],
+["2026-04","רבו פיטנס אשדוד - הגדוד העברי 5 גן העיר","IL Professional (Monthly)",163],
+["2026-04","Team Bert","IL Standard (Annually)",159],
+["2026-04","Paulina Fitness - Nof HaGalil","IL Professional (Monthly)",140],
+["2026-04","Dogotel","IL Standard (Monthly)",140],
+["2026-04","BCbasketball","IL Professional (Monthly)",139],
+["2026-04","INSTINCT MMA","IL Standard (Annually)",138],
+["2026-04","NOM Gaming","IL Standard (Annually)",128],
+["2026-04","פילאטיס מכשירים הסוכה 14 ראשון לציון","IL Professional (Monthly)",114],
+["2026-04","סטודיו נוף","IL Standard (Monthly)",111],
+["2026-04","Tone Line","IL Standard (Annually)",111],
+["2026-04","פילאטיס מכשירים - נעמי שמר 7 בת ים","IL Professional (Monthly)",109],
+["2026-04","FORTE","IL Standard (Annually)",108],
+["2026-04","Studio Jenny","IL Standard (Annually)",106],
+["2026-04","CrossFit City Of David","IL Standard (Monthly)",104],
+["2026-04","פילאטיס מכשירים מנחם בגין 21 מודיעין","IL Professional (Monthly)",100],
+["2026-04","BE FREE גולן","IL Standard (Monthly)",92],
+["2026-04","Unique Fitness","IL Standard (Monthly)",89],
+["2026-04","Move","IL Standard (Monthly)",86],
+["2026-04","lalifit","IL Standard (Monthly)",84],
+["2026-04","Shape Plus","IL Standard (Monthly)",80],
+["2026-04","פילאטיס מכשירים שלם 30 רמת גן","IL Professional (Monthly)",77],
+["2026-04","Be Strong","IL Standard (Monthly)",77],
+["2026-04","Wellbe","IL Professional (Monthly)",73],
+["2026-04","DM STUDIO","IL Professional (Annually)",72],
+["2026-04","TITANS fight academy","IL Standard (Monthly)",71],
+["2026-04","the studio","IL Standard (Annually)",66],
+["2026-04","פרינאמה","IL Standard (Annually)",65],
+["2026-04","Infinity","IL Standard (Monthly)",60],
+["2026-04","Team Lider - אימוני כושר לילדים ונערים","IL Standard (Monthly)",59],
+["2026-04","CrossFit Hod Hasharon","IL Standard (Annually)",59],
+["2026-04","ROCKA STUDIO","IL Standard (Annually)",57],
+["2026-04","Legends Clinic","IL Clinics Business (Monthly)",56],
+["2026-04","MY STUDIOS","IL Professional (Monthly)",53],
+["2026-04","TALEL FITNESS","IL Standard (Monthly)",53],
+["2026-04","Fight TLV","IL Standard (Monthly)",50],
+["2026-04","Who cares how you dance","Free Account",48],
+["2026-04","המרכז לעין יבשה","IL Clinics Business (Monthly)",45],
+["2026-04","פראנה","IL Professional (Monthly)",44],
+["2026-04","FEEL","IL Professional (Monthly)",44],
+["2026-04","Fit in","IL Standard (Monthly)",43],
+["2026-04","היולי","IL Standard (Annually)",41],
+["2026-04","U fit","IL Professional (Annually)",37],
+["2026-03","Stage 1-פתח תקווה","IL Standard (Monthly)",783918],
+["2026-03","Qualia","IL Standard (Monthly)",89533],
+["2026-03","calima - מתחם קליסטניקס","IL Standard (Monthly)",28647],
+["2026-03","האימוניה","IL Standard (Annually)",19692],
+["2026-03","U fit","IL Professional (Annually)",16622],
+["2026-03","TOPSA","IL Standard (Monthly)",11499],
+["2026-03","PilatHealth","IL Standard (Annually)",10923],
+["2026-03","הבריכה הדינאמית","IL Standard (Annually)",10034],
+["2026-03","Hitbox","IL Standard (Annually)",9607],
+["2026-03","סטודיו נעים","IL Professional (Monthly)",7445],
+["2026-03","Zoharpilates","IL Standard (Annually)",5831],
+["2026-03","Hitbox TLV","IL Standard (Annually)",5720],
+["2026-03","BINENFIT TLV","IL Professional (Monthly)",5554],
+["2026-03","Studio Ten","IL Professional (Annually)",4071],
+["2026-03","מנטל כושר קרבי","IL Standard (Monthly)",3535],
+["2026-03","Motion - Strength & Pilates","IL Standard (Monthly)",3276],
+["2026-03","ATOS ISRAEL","IL Professional (Annually)",2919],
+["2026-03","NOM Gaming","IL Standard (Annually)",2918],
+["2026-03","FreeBall","IL Standard (Annually)",2168],
+["2026-03","Soho Team","IL Professional (Monthly)",1894],
+["2026-03","Sea Gal","IL Professional (Monthly)",1752],
+["2026-03","De Club","IL Professional (Monthly)",1710],
+["2026-03","Bloc","IL Professional (Annually)",1427],
+["2026-03","Yogita","IL Standard (Annually)",1336],
+["2026-03","יוגה שאלה - יפו","IL Standard (Annually)",1323],
+["2026-03","דור בריא- מסגרת כושר והעצמה לנוער","IL Standard (Annually)",1274],
+["2026-03","being","IL Professional (Annually)",1152],
+["2026-03","Beyond Fitness Lior Klein","IL Standard (Annually)",1110],
+["2026-03","Revo Pilates","IL Professional (Monthly)",1023],
+["2026-03","Guy Vaserman My Training Studio","IL Standard (Monthly)",901],
+["2026-03","Hadass Lev Pilates House","IL Standard (Annually)",893],
+["2026-03","Roca","IL Standard (Monthly)",880],
+["2026-03","אייזיק","IL Standard (Annually)",865],
+["2026-03","בולדר חיפה","IL Standard (Monthly)",694],
+["2026-03","ארנה חולון - ARENA GYM","IL Professional (Monthly)",662],
+["2026-03","ג׳ימיבוקס - GYMIBOX","IL Professional (Annually)",621],
+["2026-03","סטודיו אפ","IL Standard (Monthly)",620],
+["2026-03","ALL.FITNESS","IL Standard (Monthly)",575],
+["2026-03","VALE STUDIO","IL Professional (Monthly)",540],
+["2026-03","עדן אוף גארדן","IL Standard (Annually)",505],
+["2026-03","איתן- כל אחד יכול","IL Standard (Annually)",461],
+["2026-03","Revo Fitness - אגם כנרת 6 נתניה","IL Professional (Monthly)",450],
+["2026-03","CrossFit White City","IL Professional (Monthly)",445],
+["2026-03","DREAM COMPLEX","IL Standard (Annually)",437],
+["2026-03","נינגה סקול","IL Professional (Annually)",396],
+["2026-03","פילאטיס מכשירים בן יהודה 77 כפר סבא","IL Professional (Monthly)",352],
+["2026-03","revo fitness - גיסין 7 פתח תקווה","IL Professional (Monthly)",338],
+["2026-03","ARC Studio","IL Professional (Monthly)",319],
+["2026-03","Steps","IL Standard (Monthly)",317],
+["2026-03","Gul Pilates","IL Professional (Annually)",289],
+["2026-03","BCbasketball","IL Professional (Monthly)",262],
+["2026-03","Revo fitness - הכישור 30 חולון","IL Professional (Monthly)",256],
+["2026-03","BE FREE גולן","IL Standard (Monthly)",253],
+["2026-03","רוני שינקמן","IL Standard (Annually)",247],
+["2026-03","האקדמיה לג'יו ג'יטסו","IL Standard (Monthly)",237],
+["2026-03","עמותת ג׳רוספורט","IL Standard (Annually)",183],
+["2026-03","עלמה","IL Standard (Monthly)",158],
+["2026-03","Dogotel","IL Standard (Monthly)",154],
+["2026-03","Revo Fitness - הדובדבן 9 קרית אונו","IL Professional (Monthly)",151],
+["2026-03","בית הספר לאומנויות לחימה - דן גדור","IL Standard (Annually)",148],
+["2026-03","CrossFit City Of David","IL Standard (Monthly)",142],
+["2026-03","Dance Community Club","IL Professional (Monthly)",138],
+["2026-03","פילאטיס מכשירים הסוכה 14 ראשון לציון","IL Professional (Monthly)",133],
+["2026-03","lalifit","IL Standard (Monthly)",131],
+["2026-03","פילאטיס מכשירים - נעמי שמר 7 בת ים","IL Professional (Monthly)",119],
+["2026-03","רבו פיטנס אשדוד - הגדוד העברי 5 גן העיר","IL Professional (Monthly)",108],
+["2026-03","Thribe","IL Professional (Annually)",107],
+["2026-03","Tone Line","IL Standard (Annually)",103],
+["2026-03","Arbox Wellness","IL Professional (Annually)",100],
+["2026-03","Revo Fitness- אור יהודה","IL Professional (Monthly)",99],
+["2026-03","Infinity","IL Standard (Monthly)",96],
+["2026-03","SEVEN","IL Standard (Monthly)",80],
+["2026-03","Team Bert","IL Standard (Annually)",78],
+["2026-03","פרינאמה","IL Standard (Annually)",77],
+["2026-03","INSTINCT MMA","IL Standard (Annually)",76],
+["2026-03","Shape Plus","IL Standard (Monthly)",76],
+["2026-03","Who cares how you dance","Free Account",69],
+["2026-02","Stage 1-פתח תקווה","IL Standard (Monthly)",157610],
+["2026-02","Qualia","IL Standard (Monthly)",75845],
+["2026-02","PilatHealth","IL Standard (Annually)",13593],
+["2026-02","TOPSA","IL Standard (Monthly)",11706],
+["2026-02","Roca","IL Standard (Monthly)",7829],
+["2026-02","Hitbox","IL Standard (Annually)",7743],
+["2026-02","אייזיק","IL Standard (Annually)",6112],
+["2026-02","נינגה סקול","IL Professional (Annually)",5818],
+["2026-02","Hitbox TLV","IL Standard (Annually)",5653],
+["2026-02","BINENFIT TLV","IL Professional (Monthly)",5542],
+["2026-02","Motion - Strength & Pilates","IL Standard (Monthly)",5035],
+["2026-02","Testing API","Free Account",4417],
+["2026-02","הבריכה הדינאמית","IL Standard (Annually)",4093],
+["2026-02","עמותת ג׳רוספורט","IL Standard (Annually)",3813],
+["2026-02","מנטל כושר קרבי","IL Standard (Monthly)",3289],
+["2026-02","Thribe","IL Professional (Annually)",2216],
+["2026-02","De Club","IL Professional (Monthly)",2117],
+["2026-02","CrossFit White City","IL Professional (Monthly)",1950],
+["2026-02","DREAM COMPLEX","IL Standard (Annually)",1775],
+["2026-02","Bloc","IL Professional (Annually)",1742],
+["2026-02","Soho Team","IL Professional (Monthly)",1546],
+["2026-02","Sea Gal","IL Professional (Monthly)",1332],
+["2026-02","דור בריא- מסגרת כושר והעצמה לנוער","IL Standard (Annually)",1332],
+["2026-02","LOCKEROOM","IL Professional (Monthly)",1273],
+["2026-02","BOOST FITNESS CENTER","IL Professional (Annually)",1167],
+["2026-02","being","IL Professional (Annually)",876],
+["2026-02","Gul Pilates","IL Professional (Annually)",804],
+["2026-02","בולדר חיפה","IL Standard (Monthly)",794],
+["2026-02","Revo Pilates","IL Professional (Monthly)",744],
+["2026-02","Hadass Lev Pilates House","IL Standard (Annually)",593],
+["2026-02","Dogotel","IL Standard (Monthly)",433],
+["2026-02","Team Lider - אימוני כושר לילדים ונערים","IL Standard (Monthly)",117],
+["2026-02","עלמה","IL Standard (Monthly)",110],
+["2026-02","Shape Plus","IL Standard (Monthly)",110],
+["2026-01","Qualia","IL Standard (Monthly)",29079],
+["2026-01","Testing API","Free Account",22177],
+["2026-01","Roca","IL Standard (Monthly)",17695],
+["2026-01","BINENFIT TLV","IL Professional (Monthly)",10929],
+["2026-01","נינגה סקול","IL Professional (Annually)",9616],
+["2026-01","Hitbox","IL Standard (Annually)",7282],
+["2026-01","Hitbox TLV","IL Standard (Annually)",5838],
+["2026-01","Thribe","IL Professional (Annually)",5657],
+["2026-01","TOPSA","IL Standard (Monthly)",4441],
+["2026-01","Gul Pilates","IL Professional (Annually)",3504],
+["2026-01","PilatHealth","IL Standard (Annually)",2505],
+["2026-01","מנטל כושר קרבי","IL Standard (Monthly)",2062],
+["2026-01","De Club","IL Professional (Monthly)",1712],
+["2026-01","דור בריא- מסגרת כושר והעצמה לנוער","IL Standard (Annually)",1683],
+["2026-01","Sea Gal","IL Professional (Monthly)",1398],
+["2026-01","Soho Team","IL Professional (Monthly)",1104],
+["2026-01","ג׳ימיבוקס - GYMIBOX","IL Professional (Annually)",855],
+["2026-01","בולדר חיפה","IL Standard (Monthly)",616],
+["2026-01","אייזיק","IL Standard (Annually)",423],
+["2026-01","Team Lider - אימוני כושר לילדים ונערים","IL Standard (Monthly)",360],
+["2026-01","Tone Line","IL Standard (Annually)",351],
+["2026-01","Motion - Strength & Pilates","IL Standard (Monthly)",345],
+["2026-01","רוני שינקמן","IL Standard (Annually)",287],
+["2026-01","נוער חזק-מסגרת כושר והעצמה לבני נוער","IL Standard (Annually)",286],
+["2026-01","Shape Plus","IL Standard (Monthly)",274],
+["2026-01","יוגה שאלה - יפו","IL Standard (Annually)",258],
+["2026-01","Dance Community Club","IL Professional (Monthly)",242],
+["2026-01","סטודיו נעים","IL Professional (Monthly)",238],
+["2026-01","Wellbe","IL Professional (Monthly)",118],
+["2026-01","Stage 1-פתח תקווה","IL Standard (Monthly)",9],
+["2025-12","Hitbox","IL Standard (Annually)",7295],
+["2025-12","Hitbox TLV","IL Standard (Annually)",5725],
+["2025-12","Testing API","Free Account",4078],
+["2025-12","Lift Studio","IL Professional (Monthly)",2763],
+["2025-12","Gul Pilates","IL Professional (Annually)",2545],
+["2025-12","Sea Gal","IL Professional (Monthly)",2509],
+["2025-12","נינגה סקול","IL Professional (Annually)",2003],
+["2025-12","דור בריא- מסגרת כושר והעצמה לנוער","IL Standard (Annually)",1505],
+["2025-12","being","IL Professional (Annually)",1429],
+["2025-12","De Club","IL Professional (Monthly)",1417],
+["2025-12","Motion - Strength & Pilates","IL Standard (Monthly)",818],
+["2025-12","Team Lider - אימוני כושר לילדים ונערים","IL Standard (Monthly)",412],
+["2025-12","ג׳ימיבוקס - GYMIBOX","IL Professional (Annually)",280],
+["2025-12","רוני שינקמן","IL Standard (Annually)",264],
+["2025-12","נוער חזק-מסגרת כושר והעצמה לבני נוער","IL Standard (Annually)",262],
+["2025-12","CrossFit City Of David","IL Standard (Monthly)",138],
+["2025-12","מנטל כושר קרבי","IL Standard (Monthly)",137],
+["2025-12","Tone Line","IL Standard (Annually)",126],
+["2025-12","Wellbe","IL Professional (Monthly)",91],
+["2025-11","Gul Pilates","IL Professional (Annually)",9994],
+["2025-11","Lift Studio","IL Professional (Monthly)",5645],
+["2025-11","being","IL Professional (Annually)",1577],
+["2025-11","Testing API","Free Account",1134],
+["2025-11","Team Lider - אימוני כושר לילדים ונערים","IL Standard (Monthly)",600],
+["2025-11","רוני שינקמן","IL Standard (Annually)",565],
+["2025-11","Hitbox","IL Standard (Annually)",431],
+["2025-11","דור בריא- מסגרת כושר והעצמה לנוער","IL Standard (Annually)",229],
+["2025-11","Tone Line","IL Standard (Annually)",218],
+["2025-11","סטודיו נעים","IL Professional (Monthly)",174],
+["2025-11","Hitbox TLV","IL Standard (Annually)",154],
+["2025-11","Wellbe","IL Professional (Monthly)",96],
+["2025-10","רוני שינקמן","IL Standard (Annually)",339],
+["2025-10","BINENFIT TLV","IL Professional (Monthly)",238],
+["2025-10","Lift Studio","IL Professional (Monthly)",175],
+["2025-10","Wellbe","IL Professional (Monthly)",73],
+["2025-10","Team Lider - אימוני כושר לילדים ונערים","IL Standard (Monthly)",10],
+["2025-09","רוני שינקמן","IL Standard (Annually)",99],
+["2025-09","Wellbe","IL Professional (Monthly)",72],
+["2025-08","Wellbe","IL Professional (Monthly)",100],
+["2025-07","Wellbe","IL Professional (Monthly)",205],
+["2025-06","Wellbe","IL Professional (Monthly)",634],
+["2025-05","Wellbe","IL Professional (Monthly)",1156],
+];
+
+const MONTHS=["2025-05","2025-06","2025-07","2025-08","2025-09","2025-10","2025-11","2025-12","2026-01","2026-02","2026-03","2026-04","2026-05"];
+const MONTH_LABELS=["מאי 25","יונ 25","יול 25","אוג 25","ספט 25","אוק 25","נוב 25","דצמ 25","ינו 26","פבר 26","מרצ 26","אפר 26","מאי 26"];
+
+const pivot={};
+RAW.forEach(([m,name,pkg,val])=>{
+  const k=name+'|||'+pkg;
+  if(!pivot[k]) pivot[k]={name,pkg,months:{},total:0};
+  pivot[k].months[m]=(pivot[k].months[m]||0)+val;
+  pivot[k].total+=val;
+});
+let rows=Object.values(pivot);
+let sortCol='total', sortDir=-1;
+
+function fmt(n){
+  if(!n) return '';
+  if(n>=1000000) return (n/1000000).toFixed(1)+'M';
+  if(n>=1000) return (n/1000).toFixed(n>=10000?0:1)+'K';
+  return n.toLocaleString();
+}
+
+const allVals=RAW.map(r=>r[3]);
+const maxLog=Math.log(Math.max(...allVals)+1);
+
+function heatStyle(val){
+  if(!val) return '';
+  const t=Math.log(val+1)/maxLog;
+  if(t<0.33){
+    const a=t/0.33;
+    const r=Math.round(224+a*(144-224));
+    const g=Math.round(247+a*(224-247));
+    const b=Math.round(252+a*(239-252));
+    return `background:rgb(${r},${g},${b});color:#006a80;`;
+  } else if(t<0.66){
+    const a=(t-0.33)/0.33;
+    const r=Math.round(144+a*(0-144));
+    const g=Math.round(224+a*(180-224));
+    const b=Math.round(239+a*(216-239));
+    return `background:rgb(${r},${g},${b});color:#004d63;`;
+  } else {
+    const a=(t-0.66)/0.34;
+    const r=Math.round(0+a*(27-0));
+    const g=Math.round(180+a*(42-180));
+    const b=Math.round(216+a*(74-216));
+    return `background:rgb(${r},${g},${b});color:#fff;font-weight:600;`;
+  }
+}
+
+function pkgClass(pkg){
+  if(/free/i.test(pkg)) return 'free';
+  if(/trial/i.test(pkg)) return 'trial';
+  if(/basic/i.test(pkg)) return 'basic';
+  if(/professional/i.test(pkg)) return 'pro';
+  if(/global/i.test(pkg)) return 'global';
+  if(/clinic/i.test(pkg)) return 'clinic';
+  return '';
+}
+
+function render(){
+  const q=document.getElementById('search').value.toLowerCase();
+  let filtered=rows.filter(r=>r.name.toLowerCase().includes(q)||r.pkg.toLowerCase().includes(q));
+  filtered.sort((a,b)=>{
+    const av=sortCol==='total'?a.total:(a.months[sortCol]||0);
+    const bv=sortCol==='total'?b.total:(b.months[sortCol]||0);
+    return sortDir*(bv-av);
+  });
+  const tot=filtered.reduce((s,r)=>s+r.total,0);
+  document.getElementById('stats').innerHTML=`
+    <div class="stat"><div class="stat-label">עסקים פעילים</div><div class="stat-val">${filtered.length}</div></div>
+    <div class="stat"><div class="stat-label">סה"כ בקשות</div><div class="stat-val">${tot>=1000000?(tot/1000000).toFixed(1)+'M':tot>=1000?Math.round(tot/1000)+'K':tot.toLocaleString()}</div></div>
+    <div class="stat"><div class="stat-label">חודשים</div><div class="stat-val">${MONTHS.length}</div></div>
+  `;
+  const arrow=d=>(d===-1?'↓':'↑');
+  document.getElementById('head').innerHTML=`<tr>
+    <th class="col-biz${sortCol==='name'?' sorted':''}" onclick="setSort('name')" style="cursor:pointer">עסק ${sortCol==='name'?arrow(sortDir):''}</th>
+    <th class="col-pkg">חבילה</th>
+    ${MONTHS.map((m,i)=>`<th class="col-month${sortCol===m?' sorted':''}" onclick="setSort('${m}')">${MONTH_LABELS[i]} ${sortCol===m?arrow(sortDir):''}</th>`).join('')}
+    <th class="col-total${sortCol==='total'?' sorted':''}" onclick="setSort('total')" style="cursor:pointer">סה"כ ${sortCol==='total'?arrow(sortDir):''}</th>
+  </tr>`;
+  if(!filtered.length){
+    document.getElementById('body').innerHTML=`<tr><td colspan="${MONTHS.length+3}" class="no-rows">לא נמצאו תוצאות</td></tr>`;
+    return;
+  }
+  document.getElementById('body').innerHTML=filtered.map(r=>`<tr>
+    <td class="col-biz" title="${r.name}">${r.name}</td>
+    <td class="col-pkg"><span class="pkg-badge ${pkgClass(r.pkg)}" title="${r.pkg}">${r.pkg}</span></td>
+    ${MONTHS.map(m=>{
+      const v=r.months[m]||0;
+      return `<td class="col-val" style="${heatStyle(v)}" title="${m}: ${v?v.toLocaleString():'-'}">${fmt(v)}</td>`;
+    }).join('')}
+    <td class="col-total">${fmt(r.total)}</td>
+  </tr>`).join('');
+}
+
+function setSort(col){
+  sortCol===col ? sortDir*=-1 : (sortCol=col, sortDir=-1);
+  render();
+}
+
+function exportCSV(){
+  const q=document.getElementById('search').value.toLowerCase();
+  let filtered=rows.filter(r=>r.name.toLowerCase().includes(q)||r.pkg.toLowerCase().includes(q));
+  filtered.sort((a,b)=>sortDir*(
+    (sortCol==='total'?b.total:(b.months[sortCol]||0))-(sortCol==='total'?a.total:(a.months[sortCol]||0))
+  ));
+  const header=['עסק','חבילה',...MONTH_LABELS,'סה"כ'];
+  const csvRows=[header.join(','),...filtered.map(r=>[
+    `"${r.name}"`,`"${r.pkg}"`,
+    ...MONTHS.map(m=>r.months[m]||0),
+    r.total
+  ].join(','))];
+  const blob=new Blob(['\uFEFF'+csvRows.join('\n')],{type:'text/csv;charset=utf-8'});
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);
+  a.download='arbox_api_usage.csv';
+  a.click();
+}
+
+render();
+</script>
+</body>
+</html>
